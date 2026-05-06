@@ -1,0 +1,9 @@
+# ═══════════════════════════════════════════════════════════════
+# GenAI Platform — AI Service Helm Chart
+# ═══════════════════════════════════════════════════════════════
+apiVersion: v2
+name: ai-service
+description: FastAPI AI Service for content generation and localization
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

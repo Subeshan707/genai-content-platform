@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════════════
+# GenAI Content Creation Platform
+# ═══════════════════════════════════════════════════════════════
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+target/
+dist/
+build/
+.mvn/wrapper/maven-wrapper.jar
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform (not tracked)
+infrastructure/terraform/
+infrastructure/terraform-lite/
+
+# CDK
+infrastructure/cdk/dist/
+infrastructure/cdk/cdk.out/
+
+# Docker
+*.log
+
+# Test
+.coverage
+htmlcov/
+.pytest_cache/
+test-results/
+
+# Compiled Java
+*.class
+*.jar
+
+# Generated
+*.min.js
+*.min.css

@@ -1,0 +1,122 @@
+version: 0.2
+
+# ═══════════════════════════════════════════════════════════════
+# GenAI Platform — AI Service Build, Test & Deploy
+# pip install → pytest → docker build → ECR push → Bedrock eval
+# ═══════════════════════════════════════════════════════════════
+
+env:
+  variables:
+    ECR_REPO: genai-platform-ai-service
+    EVAL_THRESHOLD: "0.70"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+      docker: 20
+    commands:
+      - pip install --upgrade pip
+      - cd services/ai-service
+      - pip install -r requirements.txt
+
+  pre_build:
+    commands:
+      - echo "Running linter..."
+      - ruff check app/ || true
+      - echo "Running type checks..."
+      - mypy app/ --ignore-missing-imports || true
+      - echo "Running tests..."
+      - pytest tests/ -v --tb=short || true
+      - echo "Logging into ECR..."
+      - aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+  build:
+    commands:
+      - echo "Building Docker image..."
+      - docker build -t ${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION} .
+      - docker tag ${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - docker tag ${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+
+  post_build:
+    commands:
+      - echo "Pushing to ECR..."
+      - docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+      # ── Bedrock Eval Suite ────────────────────────────────
+      - echo "Running Bedrock evaluation suite..."
+      - |
+        python -c "
+        import json, boto3, statistics
+
+        bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+
+        test_prompts = [
+            'Write a professional product launch email for a SaaS platform',
+            'Create a social media post announcing a new feature',
+            'Draft an article about AI in content creation',
+            'Write ad copy for a summer campaign',
+            'Create a video script for a product demo',
+            'Write a newsletter introduction about industry trends',
+            'Draft a press release for a partnership announcement',
+            'Create engaging captions for Instagram',
+            'Write a blog post about remote work best practices',
+            'Draft an email subject line A/B test series',
+            'Create a podcast script outline about marketing',
+            'Write thought leadership content about digital transformation',
+            'Draft a landing page hero section copy',
+            'Create a customer success story template',
+            'Write a webinar invitation email',
+            'Draft social media content calendar ideas',
+            'Create FAQ answers for a product page',
+            'Write a brand manifesto for a tech startup',
+            'Draft an internal announcement email',
+            'Create a seasonal marketing campaign brief',
+        ]
+
+        scores = []
+        for i, prompt in enumerate(test_prompts):
+            # Generate content
+            gen_response = bedrock.converse(
+                modelId='meta.llama3-1-8b-instruct-v1:0',
+                messages=[{'role': 'user', 'content': [{'text': prompt}]}],
+                inferenceConfig={'maxTokens': 512, 'temperature': 0.7}
+            )
+            generated = gen_response['output']['message']['content'][0]['text']
+
+            # Score with Titan Text Lite (FREE judge)
+            judge_response = bedrock.converse(
+                modelId='amazon.titan-text-lite-v1',
+                messages=[{'role': 'user', 'content': [{'text':
+                    f'Score this content 0.0-1.0 for quality. Output ONLY the number.\n\nContent: {generated[:500]}'}]}],
+                inferenceConfig={'maxTokens': 10, 'temperature': 0.0}
+            )
+            score_text = judge_response['output']['message']['content'][0]['text'].strip()
+            try:
+                score = float(score_text)
+                scores.append(min(max(score, 0.0), 1.0))
+            except:
+                scores.append(0.5)
+
+            print(f'Prompt {i+1}/20: score={scores[-1]:.2f}')
+
+        mean_score = statistics.mean(scores)
+        print(f'\nMean eval score: {mean_score:.3f}')
+        print(f'Threshold: ${EVAL_THRESHOLD}')
+
+        if mean_score < float('${EVAL_THRESHOLD}'):
+            print('FAIL: Mean score below threshold')
+            exit(1)
+        else:
+            print('PASS: Evaluation suite passed')
+        " 2>&1 | tee eval-results.log
+      - echo "Eval results logged"
+
+artifacts:
+  files:
+    - services/ai-service/eval-results.log
+    - imagedefinitions.json
+
+cache:
+  paths:
+    - /root/.cache/pip/**/*

@@ -1,0 +1,191 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────
+# GenAI Content Creation Platform — Local Development Stack
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # ── FastAPI AI Service ───────────────────────────────────
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: genai-ai-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/ai-service:/app
+      - /app/__pycache__
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - SQS_ENDPOINT=http://localstack:4566
+      - S3_ENDPOINT=http://localstack:4566
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - genai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Spring Boot Core Service ─────────────────────────────
+  core-service:
+    build:
+      context: ./services/core-service
+      dockerfile: Dockerfile
+    container_name: genai-core-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./services/core-service/src:/app/src
+      - core-service-m2:/root/.m2
+    env_file: .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/genai_platform
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-genai_admin}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-changeme_postgres_password}
+      - SPRING_DATA_MONGODB_URI=mongodb://${MONGO_USER:-genai_admin}:${MONGO_PASSWORD:-changeme_mongo_password}@mongo:27017/${MONGO_DB:-genai_locales}?authSource=admin
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:-changeme_redis_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - genai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── PostgreSQL 16 + pgvector ─────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: genai-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-genai_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-genai_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - genai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-genai_admin} -d ${POSTGRES_DB:-genai_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MongoDB 7 (DocumentDB-compatible) ───────────────────
+  mongo:
+    image: mongo:7
+    container_name: genai-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-genai_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-changeme_mongo_password}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-genai_locales}
+    volumes:
+      - mongo-data:/data/db
+      - ./infrastructure/db/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - genai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis 7 (ElastiCache-compatible) ────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: genai-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme_redis_password} --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - genai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme_redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── LocalStack (S3, SQS, SNS, EventBridge) ─────────────
+  localstack:
+    image: localstack/localstack:3
+    container_name: genai-localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=s3,sqs,sns,events,sts,secretsmanager
+      - DEBUG=0
+      - DEFAULT_REGION=${AWS_REGION:-us-east-1}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infrastructure/localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh
+    networks:
+      - genai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Adminer (DB GUI) ────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: genai-adminer
+    ports:
+      - "8888:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    networks:
+      - genai-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+networks:
+  genai-network:
+    driver: bridge
+    name: genai-network
+
+volumes:
+  postgres-data:
+  mongo-data:
+  redis-data:
+  localstack-data:
+  core-service-m2:

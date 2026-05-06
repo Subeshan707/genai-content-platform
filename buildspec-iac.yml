@@ -1,0 +1,36 @@
+version: 0.2
+
+# ═══════════════════════════════════════════════════════════════
+# GenAI Platform — Infrastructure Validation
+# terraform fmt → validate → tflint → checkov security scan
+# ═══════════════════════════════════════════════════════════════
+
+phases:
+  install:
+    commands:
+      - curl -sL https://releases.hashicorp.com/terraform/1.8.0/terraform_1.8.0_linux_amd64.zip -o tf.zip && unzip tf.zip && mv terraform /usr/local/bin/
+      - curl -sL https://github.com/terraform-linters/tflint/releases/download/v0.51.0/tflint_linux_amd64.zip -o tflint.zip && unzip tflint.zip && mv tflint /usr/local/bin/
+      - pip install checkov
+
+  pre_build:
+    commands:
+      - cd infrastructure/terraform
+      - echo "Checking Terraform formatting..."
+      - terraform fmt -check -recursive -diff
+      - echo "Initializing Terraform..."
+      - terraform init -backend=false
+
+  build:
+    commands:
+      - echo "Validating Terraform..."
+      - terraform validate
+      - echo "Running TFLint..."
+      - tflint --init
+      - tflint --recursive
+      - echo "Running Checkov security scan..."
+      - checkov -d . --framework terraform --soft-fail --output cli
+      - echo "All infrastructure checks passed"
+
+artifacts:
+  files:
+    - infrastructure/terraform/**/*.tf

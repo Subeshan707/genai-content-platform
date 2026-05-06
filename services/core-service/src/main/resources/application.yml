@@ -1,0 +1,136 @@
+# ═══════════════════════════════════════════════════════════════
+# GenAI Content Platform — Spring Boot Core Service Configuration
+# ═══════════════════════════════════════════════════════════════
+
+spring:
+  application:
+    name: genai-core-service
+
+  # ── PostgreSQL (Aurora Serverless v2) ─────────────────────
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:genai_platform}
+    username: ${POSTGRES_USER:genai_admin}
+    password: ${POSTGRES_PASSWORD:changeme_postgres_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: none  # Flyway manages schema — never use validate/update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  # ── Flyway Migrations ────────────────────────────────────
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+  # ── MongoDB (DocumentDB) ─────────────────────────────────
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:genai_admin}:${MONGO_PASSWORD:changeme_mongo_password}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DB:genai_locales}?authSource=admin
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:changeme_redis_password}
+      timeout: 5000
+
+  # ── Security ──────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://cognito-idp.${COGNITO_REGION:us-east-1}.amazonaws.com/${COGNITO_USER_POOL_ID:us-east-1_XXXXXXXXX}
+          jwk-set-uri: https://cognito-idp.${COGNITO_REGION:us-east-1}.amazonaws.com/${COGNITO_USER_POOL_ID:us-east-1_XXXXXXXXX}/.well-known/jwks.json
+
+# ── Server ────────────────────────────────────────────────
+server:
+  port: ${CORE_SERVICE_PORT:8080}
+  # NOTE: No context-path here — controllers already have /api prefix
+
+# ── Actuator ──────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+    mongo:
+      enabled: true
+
+# ── AWS Configuration ────────────────────────────────────
+aws:
+  region: ${AWS_REGION:us-east-1}
+  cognito:
+    user-pool-id: ${COGNITO_USER_POOL_ID:us-east-1_XXXXXXXXX}
+    client-id: ${COGNITO_CLIENT_ID:xxxxxxxxxxxxxxxxxxxxxxxxxx}
+  sqs:
+    endpoint: ${SQS_ENDPOINT:}
+    content-ingest-queue: ${SQS_CONTENT_INGEST_QUEUE:content-ingest.fifo}
+    localize-queue: ${SQS_LOCALIZE_QUEUE:localize.fifo}
+    image-generate-queue: ${SQS_IMAGE_GENERATE_QUEUE:image-generate}
+    cms-publish-queue: ${SQS_CMS_PUBLISH_QUEUE:cms-publish.fifo}
+  s3:
+    endpoint: ${S3_ENDPOINT:}
+    brand-docs-bucket: ${S3_BRAND_DOCS_BUCKET:genai-brand-docs}
+    media-assets-bucket: ${S3_MEDIA_ASSETS_BUCKET:genai-media-assets}
+
+# ── AI Service URL ───────────────────────────────────────
+ai-service:
+  base-url: http://${AI_SERVICE_HOST:localhost}:${AI_SERVICE_PORT:8000}
+
+# ── OpenAPI / Springdoc ──────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  show-actuator: false
+
+# ── Logging ──────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.genai.platform: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+---
+# ── Local Profile ────────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: local
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/mock-issuer
+
+logging:
+  level:
+    root: INFO
+    com.genai.platform: DEBUG
+    org.hibernate.SQL: DEBUG

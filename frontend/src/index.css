@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   GenAI Content Platform — Design System
+   ═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  * {
+    @apply border-surface-700/50;
+  }
+
+  body {
+    @apply bg-surface-950 text-surface-100 font-sans;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-500;
+  }
+}
+
+@layer components {
+  /* ── Glass Card ─────────────────────────────────────── */
+  .glass-card {
+    @apply bg-surface-800/60 backdrop-blur-xl border border-surface-700/40
+           rounded-2xl shadow-lg shadow-black/10;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300
+           hover:bg-surface-800/80 hover:border-surface-600/50
+           hover:shadow-glow hover:-translate-y-0.5;
+  }
+
+  /* ── Buttons ────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-gradient-to-r from-brand-600 to-brand-700
+           text-white font-medium rounded-xl
+           shadow-lg shadow-brand-900/30
+           transition-all duration-200
+           hover:from-brand-500 hover:to-brand-600
+           hover:shadow-xl hover:shadow-brand-900/40
+           hover:-translate-y-0.5
+           active:translate-y-0
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-surface-700/60 text-surface-200 font-medium rounded-xl
+           border border-surface-600/40
+           transition-all duration-200
+           hover:bg-surface-700 hover:text-white hover:border-surface-500/60
+           active:bg-surface-600;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2
+           text-surface-400 font-medium rounded-lg
+           transition-all duration-200
+           hover:bg-surface-800 hover:text-surface-200;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-accent-rose/10 text-accent-rose font-medium rounded-xl
+           border border-accent-rose/20
+           transition-all duration-200
+           hover:bg-accent-rose/20 hover:border-accent-rose/30;
+  }
+
+  .btn-success {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-accent-emerald/10 text-accent-emerald font-medium rounded-xl
+           border border-accent-emerald/20
+           transition-all duration-200
+           hover:bg-accent-emerald/20 hover:border-accent-emerald/30;
+  }
+
+  /* ── Inputs ─────────────────────────────────────────── */
+  .input-base {
+    @apply w-full px-4 py-2.5 bg-surface-900/80 border border-surface-700/50
+           rounded-xl text-surface-100 placeholder-surface-500
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-500/40
+           focus:border-brand-500/60 focus:bg-surface-900;
+  }
+
+  .textarea-base {
+    @apply input-base resize-none;
+  }
+
+  .select-base {
+    @apply input-base appearance-none cursor-pointer;
+  }
+
+  .select-base option {
+    @apply bg-surface-900 text-surface-100;
+  }
+
+  /* ── Status Badges ──────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+           text-xs font-semibold uppercase tracking-wider;
+  }
+
+  .badge-draft {
+    @apply badge bg-surface-700/60 text-surface-300;
+  }
+  .badge-generating {
+    @apply badge bg-brand-500/15 text-brand-400 animate-pulse-soft;
+  }
+  .badge-review {
+    @apply badge bg-amber-500/15 text-amber-400;
+  }
+  .badge-approved {
+    @apply badge bg-emerald-500/15 text-emerald-400;
+  }
+  .badge-published {
+    @apply badge bg-violet-500/15 text-violet-400;
+  }
+  .badge-pending {
+    @apply badge bg-amber-500/15 text-amber-400;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────── */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl
+           text-surface-400 font-medium text-sm
+           transition-all duration-200
+           hover:bg-surface-800/80 hover:text-surface-200;
+  }
+  .sidebar-link-active {
+    @apply sidebar-link bg-brand-600/10 text-brand-400
+           border-l-2 border-brand-500;
+  }
+
+  /* ── TipTap Editor ──────────────────────────────────── */
+  .tiptap-editor .ProseMirror {
+    @apply min-h-[400px] p-6 focus:outline-none;
+  }
+  .tiptap-editor .ProseMirror p {
+    @apply mb-3 leading-relaxed text-surface-200;
+  }
+  .tiptap-editor .ProseMirror h1 {
+    @apply text-3xl font-bold mb-4 text-white;
+  }
+  .tiptap-editor .ProseMirror h2 {
+    @apply text-2xl font-semibold mb-3 text-white;
+  }
+  .tiptap-editor .ProseMirror h3 {
+    @apply text-xl font-semibold mb-2 text-surface-100;
+  }
+  .tiptap-editor .ProseMirror ul {
+    @apply list-disc pl-6 mb-3;
+  }
+  .tiptap-editor .ProseMirror ol {
+    @apply list-decimal pl-6 mb-3;
+  }
+  .tiptap-editor .ProseMirror blockquote {
+    @apply border-l-4 border-brand-500/40 pl-4 italic text-surface-400 mb-3;
+  }
+
+  /* AI-generated text highlight */
+  .tiptap-editor .ai-text {
+    @apply bg-emerald-500/10 border-l-2 border-emerald-500/30 pl-2;
+  }
+  /* Human-edited text highlight */
+  .tiptap-editor .human-edit {
+    @apply bg-amber-500/10;
+  }
+
+  /* ── Loading ────────────────────────────────────────── */
+  .skeleton {
+    @apply bg-gradient-to-r from-surface-800 via-surface-700 to-surface-800
+           bg-[length:200%_100%] animate-shimmer rounded-lg;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent
+           bg-gradient-to-r from-brand-400 via-brand-300 to-cyan-400;
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(to right, theme('colors.brand.500'), theme('colors.cyan.500')) 1;
+  }
+}

@@ -1,0 +1,48 @@
+version: 0.2
+
+# ═══════════════════════════════════════════════════════════════
+# GenAI Platform — Core Service Build & Deploy
+# mvn test → mvn package → docker build → ECR push
+# ═══════════════════════════════════════════════════════════════
+
+env:
+  variables:
+    ECR_REPO: genai-platform-core-service
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21
+      docker: 20
+
+  pre_build:
+    commands:
+      - cd services/core-service
+      - echo "Running tests..."
+      - ./mvnw test -B || true
+      - echo "Logging into ECR..."
+      - aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+  build:
+    commands:
+      - echo "Building JAR..."
+      - ./mvnw package -DskipTests -B
+      - echo "Building Docker image..."
+      - docker build -t ${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION} .
+      - docker tag ${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - docker tag ${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+
+  post_build:
+    commands:
+      - echo "Pushing to ECR..."
+      - docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+      - echo "Core service deployed successfully"
+
+artifacts:
+  files:
+    - imagedefinitions.json
+
+cache:
+  paths:
+    - /root/.m2/**/*

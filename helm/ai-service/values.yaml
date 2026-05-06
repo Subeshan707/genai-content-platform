@@ -1,0 +1,88 @@
+# ═══════════════════════════════════════════════════════════════
+# AI Service — Helm Values
+# ═══════════════════════════════════════════════════════════════
+
+replicaCount: 2
+
+image:
+  repository: ""  # Set via CI/CD: {account}.dkr.ecr.{region}.amazonaws.com/genai-platform-ai-service
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ai-service
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # Set to IRSA role ARN
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+  hosts:
+    - host: ai.genai-platform.internal
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+env:
+  - name: AWS_REGION
+    value: "us-east-1"
+  - name: BEDROCK_TEXT_MODEL_ID
+    value: "meta.llama3-1-8b-instruct-v1:0"
+  - name: BEDROCK_TEXT_LITE_MODEL_ID
+    value: "amazon.titan-text-lite-v1"
+  - name: BEDROCK_EMBED_MODEL_ID
+    value: "amazon.titan-embed-text-v2:0"
+  - name: BEDROCK_IMAGE_MODEL_ID
+    value: "amazon.titan-image-generator-v1"
+  - name: ENABLE_XRAY
+    value: "true"
+
+envFrom:
+  - secretRef:
+      name: ai-service-secrets  # Contains POSTGRES_*, REDIS_*, MONGO_*
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 15
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+nodeSelector:
+  node-type: graviton3-spot
+
+tolerations:
+  - key: "spot"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"

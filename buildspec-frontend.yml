@@ -1,0 +1,44 @@
+version: 0.2
+
+# ═══════════════════════════════════════════════════════════════
+# GenAI Platform — Frontend Build & Deploy
+# npm ci → build → S3 sync → CloudFront invalidation
+# ═══════════════════════════════════════════════════════════════
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - cd frontend
+      - npm ci --prefer-offline
+
+  pre_build:
+    commands:
+      - echo "Running lint..."
+      - npm run lint || true
+      - echo "Build number $CODEBUILD_BUILD_NUMBER"
+
+  build:
+    commands:
+      - echo "Building production bundle..."
+      - npm run build
+      - echo "Build complete"
+
+  post_build:
+    commands:
+      - echo "Syncing to S3..."
+      - aws s3 sync dist/ s3://${FRONTEND_BUCKET}/ --delete --cache-control "public, max-age=31536000, immutable" --exclude "index.html" --exclude "*.json"
+      - aws s3 cp dist/index.html s3://${FRONTEND_BUCKET}/index.html --cache-control "public, max-age=0, must-revalidate"
+      - echo "Invalidating CloudFront..."
+      - aws cloudfront create-invalidation --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} --paths "/*"
+      - echo "Frontend deployed successfully"
+
+artifacts:
+  files:
+    - frontend/dist/**/*
+  discard-paths: no
+
+cache:
+  paths:
+    - frontend/node_modules/**/*
