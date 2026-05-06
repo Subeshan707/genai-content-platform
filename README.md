@@ -200,4 +200,4 @@ The AI service CI pipeline includes a 20-prompt evaluation suite that:
 - Embedding cache in Redis reduces Titan Embed V2 API calls
 
 ## License
-Proprietary - internal use only.
+MIT License. See LICENSE.
